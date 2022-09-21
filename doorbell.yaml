@@ -1,5 +1,10 @@
 esphome:
   name: doorbell
+  on_boot:
+    priority: -100
+    then:
+      - delay: 1s
+      - lambda: 'id(wait_on_init) = true;'
 
 esp8266:
   board: nodemcuv2
@@ -59,6 +64,10 @@ globals:
     type: bool
     restore_value: true
     initial_value: 'true'
+    
+  - id: wait_on_init
+    type: bool
+    restore_value: no
  
 switch:
 
@@ -80,6 +89,7 @@ switch:
     id: groundfloor_door_bell
     internal: true
     icon: mdi:alarm-bell
+
 
 
 # enable configuration
@@ -167,39 +177,40 @@ switch:
 
 # button configuration
 binary_sensor:
+  - platform: template
+    id: doorbell_sensor
+    name: "Doorbell Sensor"
+    lambda: |-
+      return id(doorbell).state;
+
   - platform: gpio
+    # restore_mode: RESTORE_DEFAULT_OFF
     pin:
       number: D7
       mode: INPUT_PULLUP
       inverted: true
     name: "Doorbell"
+    id: doorbell
     filters:
       - delayed_on: 50ms
       - delayed_off: 5000ms # prevents from re-ringing within 5 seconds
+    internal: true
+    
     on_press:
       then:
-        - if: 
-            condition:
-              - switch.is_on: upstairs_chime_active
-            then:
-              switch.turn_on: upstairs_door_bell
-        - if:
-            condition:
-              - switch.is_on: groundfloor_chime_active
-            then:
-              switch.turn_on: groundfloor_door_bell
-        - delay: 200ms
-        - if: 
-            condition:
-              - switch.is_on: upstairs_chime_active
-            then:
-              switch.turn_off: upstairs_door_bell
-        - if:
-            condition:
-              - switch.is_on: groundfloor_chime_active
-            then:
-              switch.turn_off: groundfloor_door_bell
-
+        - lambda: |-
+            if (id(wait_on_init) == false) {
+                return;
+            } else {
+              id(ring).turn_on();
+            }
+        - delay: 1s
+        - lambda: |-
+            if (id(wait_on_init) == false) {
+                return;
+            } else {
+              id(ring).turn_on();
+            }
 # System status configuration
   - platform: status
     name: "Status Doorbell"
